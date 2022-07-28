@@ -57,36 +57,32 @@ public class Bot {
 		
 		String bestWord = null;
 		double maxEntropy = 0.0;
+		
+		FilterThread[] filterThreads = new FilterThread[allWords.size()];
+		Thread[] threads = new Thread[allWords.size()];
+		
+		int index = 0;
 		for (String word : allWords) {
-			double entropy = 0.0;
-			
-			/* For all possible patterns that could form from selecting this word
-			 * (based on the candidate words), see how many words would be eliminated
-			 * from the current list of possible words. The more words that are
-			 * eliminated on average, the stronger the entropy of the word. However,
-			 * keep in mind that it also means that the word and pattern combination
-			 * is unlikely since it does not match many candidate words.
-			 */
-			for (Status[] pattern : patterns) {
-				Set<String> nextWords = new HashSet<>();
-				filterWords(nextWords, pattern, word);
-				
-				/* Probability that this guess and pattern would be valid given the 
-				 * subset of possible words.
-				 */
-				double probability = (double) nextWords.size() / possibleWords.size();
-				if (probability > 0) {
-					// Formula for information is -log2(p) = log2(1/p)
-					entropy += probability * (Math.log(1.0 / probability) / Math.log(2));
-				}
+			filterThreads[index] = new FilterThread(word);
+			threads[index] = new Thread(filterThreads[index]);
+			threads[index++].start();
+		}
+		
+		index = 0;
+		for (Thread thread : threads) {
+			try {
+				index++;
+				thread.join();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
-			
-			/* Now see if there is, on average, more information from this word than others.
-			 */
-			if (Double.compare(entropy, maxEntropy) > 0 || 
-					(Double.compare(entropy, maxEntropy) == 0 && possibleWords.contains(word))) {
-				maxEntropy = entropy;
-				bestWord = word;
+		}
+		
+		for (FilterThread filterThread : filterThreads) {
+			if (Double.compare(filterThread.entropy, maxEntropy) > 0) {
+				maxEntropy = filterThread.entropy;
+				bestWord = filterThread.word;
 			}
 		}
 		
@@ -189,6 +185,41 @@ public class Bot {
 				i++;
 			}
 		}
+	}
+	
+	private class FilterThread implements Runnable {
+		
+		private String word;
+		private double entropy;
+		
+		public FilterThread(String word) {
+			this.word = word;
+			entropy = 0;
+		}
+		
+		/* For all possible patterns that could form from selecting this word
+		 * (based on the candidate words), see how many words would be eliminated
+		 * from the current list of possible words. The more words that are
+		 * eliminated on average, the stronger the entropy of the word. However,
+		 * keep in mind that it also means that the word and pattern combination
+		 * is unlikely since it does not match many candidate words.
+		 */
+		public void run() {
+			for (Status[] pattern : patterns) {
+				Set<String> nextWords = new HashSet<>();
+				filterWords(nextWords, pattern, word);
+				
+				/* Probability that this guess and pattern would be valid given the 
+				 * subset of possible words.
+				 */
+				double probability = (double) nextWords.size() / possibleWords.size();
+				if (probability > 0) {
+					// Formula for information is -log2(p) = log2(1/p)
+					entropy += probability * (Math.log(1.0 / probability) / Math.log(2));
+				}
+			}
+		}
+
 	}
 
 }
