@@ -58,13 +58,13 @@ public class Bot {
 		String bestWord = null;
 		double maxEntropy = 0.0;
 		
-		FilterThread[] filterThreads = new FilterThread[allWords.size()];
+		Worker[] workers = new Worker[allWords.size()];
 		Thread[] threads = new Thread[allWords.size()];
 		
 		int index = 0;
 		for (String word : allWords) {
-			filterThreads[index] = new FilterThread(word);
-			threads[index] = new Thread(filterThreads[index]);
+			workers[index] = new Worker(word);
+			threads[index] = new Thread(workers[index]);
 			threads[index++].start();
 		}
 		
@@ -79,10 +79,10 @@ public class Bot {
 			}
 		}
 		
-		for (FilterThread filterThread : filterThreads) {
-			if (Double.compare(filterThread.entropy, maxEntropy) > 0) {
-				maxEntropy = filterThread.entropy;
-				bestWord = filterThread.word;
+		for (Worker worker : workers) {
+			if (Double.compare(worker.entropy, maxEntropy) > 0) {
+				maxEntropy = worker.entropy;
+				bestWord = worker.word;
 			}
 		}
 		
@@ -187,12 +187,18 @@ public class Bot {
 		}
 	}
 	
-	private class FilterThread implements Runnable {
+	/**
+	 * Creates a runnable instance to process a given candidate word.
+	 * Will calculate the entropy for that word.
+	 * @author tanim
+	 *
+	 */
+	private class Worker implements Runnable {
 		
 		private String word;
 		private double entropy;
 		
-		public FilterThread(String word) {
+		public Worker(String word) {
 			this.word = word;
 			entropy = 0;
 		}
