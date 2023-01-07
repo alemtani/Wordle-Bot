@@ -5,7 +5,6 @@ import java.awt.Graphics;
 import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 import com.wordle.main.Game.STATE;
 
@@ -18,13 +17,13 @@ public class Board extends GameObject {
 	// Store logic of game
 	
 	private String targetWord;
-	private Set<String> allWords;
-	private Map<Character, Integer> targetLetters;
+	private Map<String, Map<Character, Integer>> allWords;
 	
 	private Bot bot;
 
 	public Board(int x, int y, int width, int height, Game game,
-			Tile[][] tiles, String targetWord, Set<String> allWords, ID id) {
+			Tile[][] tiles, String targetWord, 
+			Map<String, Map<Character, Integer>> allWords, ID id) {
 		super(x, y, width, height, id);
 		this.game = game;
 		this.tiles = tiles;
@@ -33,19 +32,6 @@ public class Board extends GameObject {
 		
 		currX = 0;
 		currY = 0;
-		
-		// Track target letters for in-game hints
-		
-		targetLetters = new HashMap<Character, Integer>();
-		for (int i = 0; i < Game.WORD_LENGTH; i++) {
-			char letter = targetWord.charAt(i);
-			
-			if (!targetLetters.containsKey(letter)) {
-				targetLetters.put(letter, 0);
-			}
-			
-			targetLetters.put(letter, targetLetters.get(letter) + 1);
-		}
 		
 		bot = new Bot(allWords);
 	}
@@ -77,7 +63,7 @@ public class Board extends GameObject {
 					
 					String guess = currWord.toString();
 					
-					if (allWords.contains(guess)) { // Must be valid word in list to submit
+					if (allWords.containsKey(guess)) {
 						submit(guess);
 					} else { // Inform player that word is invalid
 						Game.error = true;
@@ -107,7 +93,7 @@ public class Board extends GameObject {
 	 * @param guess
 	 */
 	private void submit(String guess) {
-		Map<Character, Integer> lettersCopy = new HashMap<>(targetLetters);
+		Map<Character, Integer> lettersCopy = new HashMap<>(allWords.get(targetWord));
 		Status[] pattern = new Status[Game.WORD_LENGTH];
 		
 		boolean foundWord = true;

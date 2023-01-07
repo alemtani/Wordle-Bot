@@ -9,7 +9,7 @@ import java.util.Set;
 public class Bot {
 	
 	// Based on the possible words, find the word that eliminates the most choices
-	private Set<String> allWords;
+	private Map<String, Map<Character, Integer>> allWords;
 	private Set<String> possibleWords;
 	private int attempts;
 	
@@ -18,9 +18,9 @@ public class Bot {
 	// There are 3^5 possible patterns
 	private static final int POSSIBLE_PATTERNS = 243;
 	
-	public Bot(Set<String> allWords) {
+	public Bot(Map<String, Map<Character, Integer>> allWords) {
 		this.allWords = allWords;
-		this.possibleWords = allWords;
+		this.possibleWords = new HashSet<>(allWords.keySet());
 		attempts = 0;
 		patterns = new Status[POSSIBLE_PATTERNS][Game.WORD_LENGTH];
 		createPatterns();
@@ -38,7 +38,7 @@ public class Bot {
 	 * @return
 	 */
 	public String computeWord() {
-		// Default word to use given no information
+		// Default word to use given no information is TARES
 		if (possibleWords.size() == allWords.size()) {
 			return "TARES";
 		}
@@ -58,31 +58,27 @@ public class Bot {
 		String bestWord = null;
 		double maxEntropy = 0.0;
 		
-		Worker[] workers = new Worker[allWords.size()];
-		Thread[] threads = new Thread[allWords.size()];
+		WordProcessor[] wordProcessors = new WordProcessor[allWords.size()];
 		
 		int index = 0;
-		for (String word : allWords) {
-			workers[index] = new Worker(word);
-			threads[index] = new Thread(workers[index]);
-			threads[index++].start();
+		for (String word : allWords.keySet()) {
+			wordProcessors[index] = new WordProcessor(word);
+			wordProcessors[index++].start();
 		}
 		
-		index = 0;
-		for (Thread thread : threads) {
+		for (WordProcessor wordProcessor : wordProcessors) {
 			try {
-				index++;
-				thread.join();
+				wordProcessor.join();
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 		
-		for (Worker worker : workers) {
-			if (Double.compare(worker.entropy, maxEntropy) > 0) {
-				maxEntropy = worker.entropy;
-				bestWord = worker.word;
+		for (WordProcessor wordProcessor : wordProcessors) {
+			if (Double.compare(wordProcessor.entropy, maxEntropy) > 0) {
+				maxEntropy = wordProcessor.entropy;
+				bestWord = wordProcessor.word;
 			}
 		}
 		
@@ -188,38 +184,84 @@ public class Bot {
 	}
 	
 	/**
-	 * Creates a runnable instance to process a given candidate word.
+	 * Creates a thread instance to process a given candidate word.
 	 * Will calculate the entropy for that word.
 	 * @author tanim
 	 *
 	 */
-	private class Worker implements Runnable {
+	private class WordProcessor extends Thread {
 		
 		private String word;
 		private double entropy;
+		private int[] counts = new int[POSSIBLE_PATTERNS];
 		
-		public Worker(String word) {
+		public WordProcessor(String word) {
 			this.word = word;
 			entropy = 0;
+			counts = new int[POSSIBLE_PATTERNS];
 		}
 		
-		/* For all possible patterns that could form from selecting this word
-		 * (based on the candidate words), see how many words would be eliminated
-		 * from the current list of possible words. The more words that are
-		 * eliminated on average, the stronger the entropy of the word. However,
-		 * keep in mind that it also means that the word and pattern combination
-		 * is unlikely since it does not match many candidate words.
+		/* For all possible words, determine the pattern that would be generated
+		 * if each possible word was the target word. If a pattern would be generated
+		 * by more candidate words, the pattern is more probable. From there we can
+		 * calculate the entropy of the pattern.
 		 */
 		public void run() {
-			for (Status[] pattern : patterns) {
-				Set<String> nextWords = new HashSet<>();
-				filterWords(nextWords, pattern, word);
+			// For all possible candidates, get the pattern generated
+			for (String candidate : possibleWords) {				
+				Map<Character, Integer> lettersCopy = new HashMap<>(allWords.get(candidate));
+				Status[] pattern = new Status[Game.WORD_LENGTH];
 				
-				/* Probability that this guess and pattern would be valid given the 
-				 * subset of possible words.
-				 */
-				double probability = (double) nextWords.size() / possibleWords.size();
-				if (probability > 0) {
+				// Create the pattern that would be generated if this were the word
+				
+				for (int i = 0; i < Game.WORD_LENGTH; i++) {
+					char currLetter = word.charAt(i);
+					char candidateLetter = candidate.charAt(i);
+					
+					if (currLetter == candidateLetter) {
+						pattern[i] = Status.MATCH;
+						lettersCopy.put(currLetter, lettersCopy.get(currLetter) - 1);
+					} else { // At this point, impossible this is the word
+						pattern[i] = Status.NONE;
+					}
+				}
+				
+				for (int i = 0; i < Game.WORD_LENGTH; i++) {
+					char currLetter = word.charAt(i);
+					char candidateLetter = candidate.charAt(i);
+					
+					if (currLetter != candidateLetter &&
+							lettersCopy.containsKey(currLetter) && 
+							lettersCopy.get(currLetter) > 0) {
+						// Essentially, still contains letter but just not in right position
+						pattern[i] = Status.CONTAINS;
+						lettersCopy.put(currLetter, lettersCopy.get(currLetter) - 1);
+					}
+				}
+				
+				// Get the index of the pattern
+				int index = 0;
+				for (int i = Game.WORD_LENGTH - 1; i >= 0; i--) {
+					index *= 3;
+					Status status = pattern[i];
+					
+					if (status == Status.CONTAINS) {
+						index++;
+					}
+					
+					if (status == Status.MATCH) {
+						index += 2;
+					}
+				}
+				
+				counts[index]++;
+			}
+						
+			// Get the entropy of each possible pattern
+			for (int i = 0; i < POSSIBLE_PATTERNS; i++) {
+				if (counts[i] > 0) {
+					double probability = (double) counts[i] / possibleWords.size();
+					
 					// Formula for information is -log2(p) = log2(1/p)
 					entropy += probability * (Math.log(1.0 / probability) / Math.log(2));
 				}

@@ -9,11 +9,11 @@ import java.awt.image.BufferStrategy;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.Set;
 
 public class Game extends Canvas implements Runnable {
 	
@@ -60,7 +60,7 @@ public class Game extends Canvas implements Runnable {
 	
 	private int attempts;
 	private String targetWord;
-	private Set<String> allWords;
+	private Map<String, Map<Character, Integer>> allWords;
 	
 	// Store possible states of the game
 	public enum STATE {
@@ -167,18 +167,32 @@ public class Game extends Canvas implements Runnable {
 	
 	private void generateTargetWord() {
 		try {
-			// Collect the list of words and store in set
+			// Collect the list of words and store in map of word to counts
 			
-			Scanner input = new Scanner(new File("src/resources/words.txt"));
+			Scanner input = new Scanner(new File("res/words.txt"));
 			
-			List<String> orderedWords = new ArrayList<String>();
+			List<String> orderedWords = new ArrayList<>();
+			allWords = new HashMap<>();
 			
 			while (input.hasNext()) {
 				String word = input.next();
-				orderedWords.add(word.toUpperCase());
+				word = word.toUpperCase();
+				
+				orderedWords.add(word);
+				allWords.put(word, new HashMap<>());
+				
+				// Store the letter counts for each word
+				for (int i = 0; i < Game.WORD_LENGTH; i++) {
+					char letter = word.charAt(i);
+					
+					if (!allWords.get(word).containsKey(letter)) {
+						allWords.get(word).put(letter, 0);
+					}
+					
+					allWords.get(word).put(
+						letter, allWords.get(word).get(letter) + 1);
+				}
 			}
-			
-			allWords = new HashSet<>(orderedWords);
 			
 			// Generate random words
 			Random random = new Random();
