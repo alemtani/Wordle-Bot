@@ -3,7 +3,7 @@ Wordle, except with the additional feature of letting a bot choose your words.
 
 ## How to Play
 
-Simply run the JAR file as an executable.
+Run the application in an IDE.
 
 Guess the five letter word in six attempts. The word will be randomly generated on every round. Additionally, you can run the bot to have a bot guess a word for you (relies on information theory). Or you can reset the game and try a new word.
 
